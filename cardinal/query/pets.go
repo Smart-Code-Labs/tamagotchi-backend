@@ -20,7 +20,7 @@ func Pets(world cardinal.WorldContext, req *PetsMsg) (*PetsReply, error) {
 	var pets []comp.Pet
 	log.Info().Msgf("Received payload to query-pets")
 	q := cardinal.NewSearch().Entity(filter.Contains(filter.Component[comp.Pet]()))
-	searchErr := q.
+	searchError := q.
 		Each(world, func(id types.EntityID) bool {
 			log.Info().Msgf("Checking: Id[%d]", id)
 			var pet *comp.Pet
@@ -32,8 +32,8 @@ func Pets(world cardinal.WorldContext, req *PetsMsg) (*PetsReply, error) {
 			return true
 		})
 
-	if searchErr != nil {
-		return nil, searchErr
+	if searchError != nil {
+		return nil, searchError
 	}
 	if err != nil {
 		return nil, err

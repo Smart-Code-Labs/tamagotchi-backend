@@ -6,13 +6,12 @@ import (
 	"pkg.world.dev/world-engine/cardinal/types"
 
 	comp "tamagotchi/component"
+	constants "tamagotchi/game"
 )
-
-const HygieneDeclineTicksPerSecond = 12
 
 // HygieneDeclineSystem declines the pet's Hy every `HygieneDeclineTicksPerSecond` tick.
 func HygieneDeclineSystem(world cardinal.WorldContext) error {
-	if world.CurrentTick()%HygieneDeclineTicksPerSecond == 0 {
+	if world.CurrentTick()%constants.DeclineTickRate == 0 {
 
 		q := cardinal.NewSearch().Entity(
 			filter.Contains(filter.Component[comp.Pet](), filter.Component[comp.Hygiene]()))

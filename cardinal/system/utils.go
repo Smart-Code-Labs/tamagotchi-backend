@@ -8,6 +8,7 @@ import (
 	"pkg.world.dev/world-engine/cardinal/types"
 
 	comp "tamagotchi/component"
+	constants "tamagotchi/game"
 )
 
 // queryTargetHealthPet queries for the target pet's entity ID and health component.
@@ -90,7 +91,7 @@ func queryTargetEnergyPet(world cardinal.WorldContext, targetNickname string) (t
 	return petID, petEnergy, err
 }
 
-func queryPetIdByName(world cardinal.WorldContext, name string) (types.EntityID, error) {
+func QueryPetIdByName(world cardinal.WorldContext, name string) (types.EntityID, error) {
 	var petID types.EntityID
 	var err error
 	searchErr := cardinal.NewSearch().Entity(
@@ -115,4 +116,37 @@ func queryPetIdByName(world cardinal.WorldContext, name string) (types.EntityID,
 		return 0, err
 	}
 	return petID, err
+}
+
+// func QueryPersonaItemIdList(world cardinal.WorldContext, personaTag string) ([]types.EntityID, error) {
+// 	var err error
+// 	var item *comp.Item
+
+// 	list := make([]types.EntityID, 0)
+
+// 	q := cardinal.NewSearch().Entity(
+// 		filter.Contains(filter.Component[comp.Item]()))
+// 	searchErr := q.Each(world,
+// 		func(id types.EntityID) bool {
+// 			item, err = cardinal.GetComponent[comp.Item](world, id)
+// 			if item.PersonaTag == personaTag {
+// 				list = append(list, id)
+// 			}
+
+// 			// Continue searching
+// 			return true
+// 		})
+// 	if searchErr != nil {
+// 		return list, err
+// 	}
+// 	return list, err
+// }
+
+func GetMessageForRange(value int, rangeMessages map[constants.Range]constants.Message) (bool, string) {
+	for r, m := range rangeMessages {
+		if value >= r.Min && value <= r.Max {
+			return true, m.Text // Return the message and true (success)
+		}
+	}
+	return false, "" // Return an empty string and false (no match)
 }

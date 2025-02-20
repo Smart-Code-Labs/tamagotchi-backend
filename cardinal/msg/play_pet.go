@@ -2,6 +2,7 @@ package msg
 
 type PlayPetMsg struct {
 	TargetNickname string `json:"target"`
+	ItemName       string `json:"item_name"`
 }
 
 type PlayPetMsgReply struct {

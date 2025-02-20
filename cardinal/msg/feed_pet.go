@@ -1,10 +1,11 @@
 package msg
 
-type EatPetMsg struct {
+type FeedPetMsg struct {
 	TargetNickname string `json:"target"`
+	ItemId         string `json:"item_id"`
 }
 
-type EatPetMsgReply struct {
+type FeedPetMsgReply struct {
 	Health   int    `json:"health"`
 	Activity string `json:"activity"`
 	Duration int    `json:"duration"`

@@ -11,15 +11,20 @@ import (
 	"pkg.world.dev/world-engine/cardinal/types"
 
 	"tamagotchi/component"
+	constants "tamagotchi/game"
 	"tamagotchi/msg"
 )
 
 const (
-	playMsgName = "game.play-pet"
+	playMsgName   = "game.play-pet"
 	createMsgName = "game.create-pet"
+	sleepMsgName  = "game.sleep-pet"
+	bathMsgName   = "game.bath-pet"
+	eatMsgname    = "game.eat-pet"
+	breedMsgName  = "game.breed-pet"
 )
 
-// TestSystem_PlaySystem_ErrorWhenTargetDoesNotExist ensures the attack message results in an error when the given
+// TestSystem_PlaySystem_ErrorWhenTargetDoesNotExist ensures the play message results in an error when the given
 // target does not exist. Note, message errors are stored in receipts; they are NOT returned from the relevant system.
 func TestSystem_PlaySystem_ErrorWhenTargetDoesNotExist(t *testing.T) {
 	tf := cardinal.NewTestFixture(t, nil)
@@ -37,8 +42,8 @@ func TestSystem_PlaySystem_ErrorWhenTargetDoesNotExist(t *testing.T) {
 	}
 }
 
-// TestSystem_PetSpawnerSystem_CanCreatePet ensures the CreatePlayer message can be used to create a new player
-// with the default amount of health. cardinal.NewSearch is used to find the newly created player.
+// TestSystem_PetSpawnerSystem_CanCreatePet ensures the Createpet message can be used to create a new pet
+// with the default amount of health. cardinal.NewSearch is used to find the newly created pet.
 func TestSystem_PetSpawnerSystem_CanCreatePet(t *testing.T) {
 	tf := cardinal.NewTestFixture(t, nil)
 	MustInitWorld(tf.World)
@@ -49,28 +54,32 @@ func TestSystem_PetSpawnerSystem_CanCreatePet(t *testing.T) {
 	})
 	tf.DoTick()
 
-	// Make sure the player creation was successful
+	// Make sure the pet creation was successful
 	createReceipt := getReceiptFromPastTick(t, tf.World, createTxHash)
 	if errs := createReceipt.Errs; len(errs) > 0 {
-		t.Fatalf("expected 0 errors when creating a player, got %v", errs)
+		t.Fatalf("expected 0 errors when creating a pet, got %v", errs)
 	}
 
-	// Make sure the newly created player has 100 health
+	// Make sure the newly created pet has 100 health
 	wCtx := cardinal.NewReadOnlyWorldContext(tf.World)
-	// This search demonstrates the use of a "Where" clause, which limits the search results to only the entity IDs
-	// that end up returning true from the anonymous function. In this case, we're looking for a specific nickname.
+
 	acc := make([]types.EntityID, 0)
-	err := cardinal.NewSearch().Entity(filter.All()).Each(wCtx, func(id types.EntityID) bool {
-		player, err := cardinal.GetComponent[component.Pet](wCtx, id)
-		if err != nil {
-			t.Fatalf("failed to get player component: %v", err)
-		}
-		if player.Nickname == nickname {
-			acc = append(acc, id)
-			return false
-		}
-		return true
-	})
+	t.Log(len(acc))
+	err := cardinal.NewSearch().Entity(filter.Contains(filter.Component[component.Pet]())).
+		Each(wCtx, func(id types.EntityID) bool {
+			t.Log(id)
+			pet, err := cardinal.GetComponent[component.Pet](wCtx, id)
+			if err != nil {
+				t.Fatalf("failed to get pet component: %v", err)
+			}
+			if pet.Nickname == nickname {
+				acc = append(acc, id)
+				return false
+			}
+			return true
+		})
+	t.Log(len(acc))
+
 	assert.NilError(t, err)
 	assert.Equal(t, len(acc), 1)
 	id := acc[0]
@@ -80,62 +89,62 @@ func TestSystem_PetSpawnerSystem_CanCreatePet(t *testing.T) {
 		t.Fatalf("failed to find entity ID: %v", err)
 	}
 	if health.HP != 100 {
-		t.Fatalf("a newly created player should have 100 health; got %v", health.HP)
+		t.Fatalf("a newly created pet should have 100 health; got %v", health.HP)
 	}
 }
 
-// TestSystem_PlaySystem_PlayingTargetReducesTheirEnergy ensures an attack message can find an existing target the
+// TestSystem_PlaySystem_PlayingTargetReducesTheirEnergy ensures an play message can find an existing target the
 // reduce the target's health.
 func TestSystem_PlaySystem_PlayingTargetReducesTheirEnergy(t *testing.T) {
 	tf := cardinal.NewTestFixture(t, nil)
 	MustInitWorld(tf.World)
 
-	const target = "jeff"
+	const target = "Manny"
 
-	// Create an initial player
+	// Create an initial pet
 	_ = tf.AddTransaction(getCreateMsgID(t, tf.World), msg.CreatePetMsg{
 		Nickname: target,
 	})
 	tf.DoTick()
 
-	// Attack the player
+	// Play the pet
 	playTxHash := tf.AddTransaction(getPlayMsgID(t, tf.World), msg.PlayPetMsg{
 		TargetNickname: target,
 	})
 	tf.DoTick()
 
-	// Make sure attack was successful
-	attackReceipt := getReceiptFromPastTick(t, tf.World, playTxHash)
-	if errs := attackReceipt.Errs; len(errs) > 0 {
-		t.Fatalf("expected no errors when attacking a player; got %v", errs)
+	// Make sure play was successful
+	playReceipt := getReceiptFromPastTick(t, tf.World, playTxHash)
+	if errs := playReceipt.Errs; len(errs) > 0 {
+		t.Fatalf("expected no errors when playing a pet; got %v", errs)
 	}
 
-	// Find the attacked player and check their health.
+	// Find the played pet and check their health.
 	wCtx := cardinal.NewReadOnlyWorldContext(tf.World)
 	var found bool
-	// This search demonstrates the "Each" pattern. Every entity ID is considered, and as long as the anonymous
-	// function return true, the search will continue.
-	searchErr := cardinal.NewSearch().Entity(filter.All()).Each(wCtx, func(id types.EntityID) bool {
-		player, err := cardinal.GetComponent[component.Pet](wCtx, id)
-		if err != nil {
-			t.Fatalf("failed to get player component for %v", id)
-		}
-		if player.Nickname != target {
-			return true
-		}
-		// The player's nickname matches the target. This is the player we care about.
-		found = true
-		energy, err := cardinal.GetComponent[component.Energy](wCtx, id)
-		if err != nil {
-			t.Fatalf("failed to get health component for %v", id)
-		}
-		// The target started with 100 HP, -10 for the attack, +1 for regen
-		if energy.E != 91 {
-			t.Fatalf("attack target should end up with 91 hp, got %v", energy.E)
-		}
+	searchErr := cardinal.NewSearch().Entity(filter.Contains(filter.Component[component.Pet]())).
+		Each(wCtx, func(id types.EntityID) bool {
+			pet, err := cardinal.GetComponent[component.Pet](wCtx, id)
+			if err != nil {
+				t.Fatalf("failed to get pet component for %v", id)
+			}
+			if pet.Nickname != target {
+				return true
+			}
+			// The pet's nickname matches the target. This is the pet we care about.
+			found = true
+			energy, err := cardinal.GetComponent[component.Energy](wCtx, id)
+			if err != nil {
+				t.Fatalf("failed to get health component for %v", id)
+			}
+			// The target started with 100 E, -10 for the play, -1 for energy decline
+			expectedEnergy := constants.InitialE - constants.EnergyReduce - 1
+			if energy.E != expectedEnergy {
+				t.Fatalf("play target should end up with %v hp, got %v", expectedEnergy, energy.E)
+			}
 
-		return false
-	})
+			return false
+		})
 	if searchErr != nil {
 		t.Fatalf("error when performing search: %v", searchErr)
 	}

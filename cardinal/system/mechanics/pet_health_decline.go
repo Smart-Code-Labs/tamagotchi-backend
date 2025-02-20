@@ -11,7 +11,7 @@ import (
 
 // HealthDeclineSystem declines the pet's Hy every `HealthDeclineTicksPerSecond` tick.
 func HealthDeclineSystem(world cardinal.WorldContext) error {
-	if world.CurrentTick()%constants.HealthDeclineTicksPerSecond == 0 {
+	if world.CurrentTick()%constants.DeclineTickRate == 0 {
 
 		q := cardinal.NewSearch().Entity(
 			filter.Contains(

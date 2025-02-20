@@ -5,5 +5,5 @@ type ThinkPetMsg struct {
 }
 
 type ThinkPetMsgReply struct {
-	Think string
+	Think string `json:"think"`
 }

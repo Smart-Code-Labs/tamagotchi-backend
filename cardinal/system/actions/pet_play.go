@@ -18,15 +18,44 @@ func PlayAction(world cardinal.WorldContext) error {
 	var petWellness *comp.Wellness
 	var petActivity *comp.Activity
 	var petThink *comp.Think
+	var pet *comp.Pet
+	var player *comp.Player
+	var item *comp.Wellness
 
+	log := world.Logger()
 	return cardinal.EachMessage(
 		world,
 		func(play cardinal.TxData[msg.PlayPetMsg]) (msg.PlayPetMsgReply, error) {
 
-			petId, err := queryPetIdByName(world, play.Msg.TargetNickname)
+			// Check if player exists
+			playerID, err := comp.FindPlayerByPersonaTag(world, play.Tx.PersonaTag)
 			if err != nil {
-				return msg.PlayPetMsgReply{}, fmt.Errorf("failed to play [get EntityID]: %w", err)
+				return msg.PlayPetMsgReply{}, err
 			}
+
+			player, err = cardinal.GetComponent[comp.Player](world, playerID)
+			if err != nil {
+				return msg.PlayPetMsgReply{}, fmt.Errorf("failed to play [get Player]: %w", err)
+			}
+
+			petId, err := player.GetPetNickname(world, play.Msg.TargetNickname)
+			if err != nil {
+				return msg.PlayPetMsgReply{}, err
+			}
+
+			itemId, err := player.GetItemByName(world, play.Msg.ItemName)
+			if err != nil {
+				return msg.PlayPetMsgReply{}, err
+			}
+
+			// get pet lvl
+			pet, err = cardinal.GetComponent[comp.Pet](world, petId)
+			if err != nil {
+				return msg.PlayPetMsgReply{}, fmt.Errorf("failed to play [get Pet]: %w", err)
+			}
+
+			// add experince and calculate lvl
+			pet.AddXP(constants.ExperienceEarn)
 
 			// check if not activity
 			petActivity, err = cardinal.GetComponent[comp.Activity](world, petId)
@@ -34,20 +63,22 @@ func PlayAction(world cardinal.WorldContext) error {
 				return msg.PlayPetMsgReply{}, fmt.Errorf("failed to play [get Activity]: %w", err)
 			}
 
-			if petActivity.Duration > 0 {
+			if petActivity.CountDown > 0 {
 				return msg.PlayPetMsgReply{}, fmt.Errorf("failed to play [already on Activity]: %w", err)
 			}
-
-			// set activity
-			petActivity.Activity = "Playing"
-			petActivity.Duration = constants.PlayDuration
 
 			petThink, err = cardinal.GetComponent[comp.Think](world, petId)
 			if err != nil {
 				return msg.PlayPetMsgReply{}, fmt.Errorf("failed to play [get Think]: %w", err)
 			}
 
-			petThink.Think = "Love to play!"
+			petThink.Think = constants.ThinkPlay
+
+			// set activity
+			petActivity.Activity = "Playing"
+			petActivity.CountDown = constants.TickHour
+			petActivity.TotalTicks = constants.TickHour
+			petActivity.Percentage = 100
 
 			// get Energy
 			petEnergy, err = cardinal.GetComponent[comp.Energy](world, petId)
@@ -56,11 +87,15 @@ func PlayAction(world cardinal.WorldContext) error {
 			}
 
 			// reduce Energy
+			log.Info().Msgf("Playing: Energy Before[%d]", petEnergy.E)
+
 			if petEnergy.E-constants.EnergyReduce > 0 {
 				petEnergy.E -= constants.EnergyReduce
 			} else {
 				return msg.PlayPetMsgReply{}, fmt.Errorf("failed to play [not enought energy]: %w", err)
 			}
+
+			log.Info().Msgf("Playing: Energy After[%d]", petEnergy.E)
 
 			// get Hygiene
 			petHygiene, err = cardinal.GetComponent[comp.Hygiene](world, petId)
@@ -81,11 +116,21 @@ func PlayAction(world cardinal.WorldContext) error {
 				return msg.PlayPetMsgReply{}, fmt.Errorf("failed to play [get Wellness]: %w", err)
 			}
 
+			item, err = cardinal.GetComponent[comp.Wellness](world, itemId)
+			if err != nil {
+				return msg.PlayPetMsgReply{}, fmt.Errorf("failed to play [get Item Wellness]: %w", err)
+			}
+
 			// increase wellness
-			if petWellness.Wn+constants.WellnessIncrease <= 100 {
-				petWellness.Wn += constants.WellnessIncrease
+			if petWellness.Wn+item.Wn <= 100 {
+				petWellness.Wn += item.Wn
 			} else {
 				petWellness.Wn = 100
+			}
+
+			// increase experience
+			if err := cardinal.SetComponent(world, petId, pet); err != nil {
+				return msg.PlayPetMsgReply{}, fmt.Errorf("failed to play [set Experince]: %w", err)
 			}
 
 			if err := cardinal.SetComponent(world, petId, petEnergy); err != nil {
@@ -113,7 +158,7 @@ func PlayAction(world cardinal.WorldContext) error {
 				Hygiene:  constants.HygieneReduce,
 				Wellness: constants.WellnessIncrease,
 				Activity: petActivity.Activity,
-				Duration: petActivity.Duration,
+				Duration: petActivity.CountDown,
 			}, nil
 		})
 }

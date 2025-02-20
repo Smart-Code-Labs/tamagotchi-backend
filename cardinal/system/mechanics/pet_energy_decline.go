@@ -6,13 +6,13 @@ import (
 	"pkg.world.dev/world-engine/cardinal/types"
 
 	comp "tamagotchi/component"
+	constants "tamagotchi/game"
 )
-
-const EnergyDeclineTicksPerSecond = 6
 
 // EnergyDeclineSystem declines the pet's E every `EnergyDeclineTicksPerSecond` tick.
 func EnergyDeclineSystem(world cardinal.WorldContext) error {
-	if world.CurrentTick()%EnergyDeclineTicksPerSecond == 0 {
+	log := world.Logger()
+	if world.CurrentTick()%constants.DeclineTickRate == 0 {
 
 		q := cardinal.NewSearch().Entity(
 			filter.Contains(filter.Component[comp.Pet](), filter.Component[comp.Energy]()))
@@ -24,9 +24,11 @@ func EnergyDeclineSystem(world cardinal.WorldContext) error {
 					return true
 				}
 
+				log.Info().Msgf("Energy Decline: Energy Before[%d]", energy.E)
 				if energy.E > 0 {
 					energy.E--
 				}
+				log.Info().Msgf("Energy Decline: Energy After[%d]", energy.E)
 
 				if err := cardinal.SetComponent(world, id, energy); err != nil {
 					return true
