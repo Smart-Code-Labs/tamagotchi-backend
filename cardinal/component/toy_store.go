@@ -1,38 +1,52 @@
+// Package component contains various components for the Tamagotchi game.
 package component
 
 import (
+	"tamagotchi/game"
+
 	"pkg.world.dev/world-engine/cardinal"
 	"pkg.world.dev/world-engine/cardinal/types"
 )
 
-// ToyProperties holds all necessary properties for a toy
-type ToyProperties struct {
-	Name        string
-	Description string
-	Price       float64
-	Wellness    int
-}
-
-// ToyKinds map initializes each toy with its properties
-var ToyKinds = map[string]ToyProperties{
-	"Ball":    {Name: "Ball", Description: "Yuuju!", Price: 5.0, Wellness: 15},
-	"Frisbee": {Name: "Frisbee", Description: "Will be back?", Price: 1.0, Wellness: 10},
-	"Rope":    {Name: "Rope", Description: "Grrrr", Price: 0.5, Wellness: 10},
-	"Stick":   {Name: "Stick", Description: "Throw it! Throw it!", Price: 0.1, Wellness: 5},
-}
-
+// ToyStore represents a toy store component that contains a list of toy entities.
 type ToyStore struct {
+	// Toys is a list of entity IDs representing the toys in the store.
 	Toys []types.EntityID `json:"toy_list"`
 }
 
+/**
+ * Name returns the name of the component.
+ *
+ * Code Flow:
+ * 1. The function simply returns the string "ToyStore" as the name of the component.
+ *
+ * Returns:
+ *   string: The name of the component.
+ */
 func (ToyStore) Name() string {
+	// Step 1: Return the string "ToyStore" as the name of the component.
 	return "ToyStore"
 }
 
+/**
+ * InitToyStore initializes the toy store by creating toy entities based on the game's toy kinds.
+ *
+ * Code Flow:
+ * 1. Fetch the logger from the world context.
+ * 2. Iterate over the game's toy kinds and create an item for each kind.
+ * 3. Create an entity for each item with the item and wellness components.
+ * 4. Append the entity ID to the toy store's list of toys.
+ * 5. Handle any errors that occur during the creation process.
+ *
+ * Parameters:
+ *   world (cardinal.WorldContext): The world context.
+ */
 func (shop *ToyStore) InitToyStore(world cardinal.WorldContext) {
+	// Step 1: Fetch the logger from the world context.
 	log := world.Logger()
 
-	for toyName, properties := range ToyKinds {
+	// Step 2: Iterate over the game's toy kinds and create an item for each kind.
+	for toyName, properties := range game.ToyKinds {
 		// Create an item with the properties from the map
 		item := Item{
 			ItemName:    toyName,
@@ -41,16 +55,19 @@ func (shop *ToyStore) InitToyStore(world cardinal.WorldContext) {
 			Price:       properties.Price,
 		}
 
-		// Create the entity with the item and its components
+		// Step 3: Create the entity with the item and its components
 		entityId, err := cardinal.Create(world, item,
 			Wellness{Wn: properties.Wellness},
 		)
 
+		// Step 5: Handle any errors that occur during the creation process.
 		if err != nil {
+			// Log the error and return.
 			log.Error().Msgf("Failed to create toy %s: %v", toyName, err)
 			return
 		}
 
+		// Step 4: Append the entity ID to the toy store's list of toys.
 		shop.Toys = append(shop.Toys, entityId)
 	}
 }

@@ -7,20 +7,20 @@ import (
 	"pkg.world.dev/world-engine/cardinal/filter"
 	"pkg.world.dev/world-engine/cardinal/types"
 
-	comp "tamagotchi/component"
-	constants "tamagotchi/game"
+	"tamagotchi/component"
+	"tamagotchi/game"
 )
 
 // queryTargetHealthPet queries for the target pet's entity ID and health component.
-func queryTargetHealthPet(world cardinal.WorldContext, targetNickname string) (types.EntityID, *comp.Health, error) {
+func queryTargetHealthPet(world cardinal.WorldContext, targetNickname string) (types.EntityID, *component.Health, error) {
 	var petID types.EntityID
-	var petHealth *comp.Health
+	var petHealth *component.Health
 	var err error
 	searchErr := cardinal.NewSearch().Entity(
-		filter.Exact(filter.Component[comp.Pet](), filter.Component[comp.Health]())).Each(world,
+		filter.Exact(filter.Component[component.Pet](), filter.Component[component.Health]())).Each(world,
 		func(id types.EntityID) bool {
-			var pet *comp.Pet
-			pet, err = cardinal.GetComponent[comp.Pet](world, id)
+			var pet *component.Pet
+			pet, err = cardinal.GetComponent[component.Pet](world, id)
 			if err != nil {
 				return false
 			}
@@ -28,7 +28,7 @@ func queryTargetHealthPet(world cardinal.WorldContext, targetNickname string) (t
 			// Terminates the search if the pet is found
 			if pet.Nickname == targetNickname {
 				petID = id
-				petHealth, err = cardinal.GetComponent[comp.Health](world, id)
+				petHealth, err = cardinal.GetComponent[component.Health](world, id)
 				if err != nil {
 					return false
 				}
@@ -52,15 +52,15 @@ func queryTargetHealthPet(world cardinal.WorldContext, targetNickname string) (t
 }
 
 // queryTargetEnergyPet queries for the target pet's entity ID and energy component.
-func queryTargetEnergyPet(world cardinal.WorldContext, targetNickname string) (types.EntityID, *comp.Energy, error) {
+func queryTargetEnergyPet(world cardinal.WorldContext, targetNickname string) (types.EntityID, *component.Energy, error) {
 	var petID types.EntityID
-	var petEnergy *comp.Energy
+	var petEnergy *component.Energy
 	var err error
 	searchErr := cardinal.NewSearch().Entity(
-		filter.Contains(filter.Component[comp.Pet](), filter.Component[comp.Energy]())).Each(world,
+		filter.Contains(filter.Component[component.Pet](), filter.Component[component.Energy]())).Each(world,
 		func(id types.EntityID) bool {
-			var pet *comp.Pet
-			pet, err = cardinal.GetComponent[comp.Pet](world, id)
+			var pet *component.Pet
+			pet, err = cardinal.GetComponent[component.Pet](world, id)
 			if err != nil {
 				return false
 			}
@@ -68,7 +68,7 @@ func queryTargetEnergyPet(world cardinal.WorldContext, targetNickname string) (t
 			// Terminates the search if the pet is found
 			if pet.Nickname == targetNickname {
 				petID = id
-				petEnergy, err = cardinal.GetComponent[comp.Energy](world, id)
+				petEnergy, err = cardinal.GetComponent[component.Energy](world, id)
 				if err != nil {
 					return false
 				}
@@ -91,44 +91,17 @@ func queryTargetEnergyPet(world cardinal.WorldContext, targetNickname string) (t
 	return petID, petEnergy, err
 }
 
-func QueryPetIdByName(world cardinal.WorldContext, name string) (types.EntityID, error) {
-	var petID types.EntityID
-	var err error
-	searchErr := cardinal.NewSearch().Entity(
-		filter.Contains(filter.Component[comp.Pet]())).Each(world,
-		func(id types.EntityID) bool {
-			var pet *comp.Pet
-			pet, err = cardinal.GetComponent[comp.Pet](world, id)
-			if err != nil {
-				return false
-			}
-
-			// Terminates the search if the pet is found
-			if pet.Nickname == name {
-				petID = id
-				return false
-			}
-
-			// Continue searching if the pet is not the target pet
-			return true
-		})
-	if searchErr != nil {
-		return 0, err
-	}
-	return petID, err
-}
-
 // func QueryPersonaItemIdList(world cardinal.WorldContext, personaTag string) ([]types.EntityID, error) {
 // 	var err error
-// 	var item *comp.Item
+// 	var item *component.Item
 
 // 	list := make([]types.EntityID, 0)
 
 // 	q := cardinal.NewSearch().Entity(
-// 		filter.Contains(filter.Component[comp.Item]()))
+// 		filter.Contains(filter.Component[component.Item]()))
 // 	searchErr := q.Each(world,
 // 		func(id types.EntityID) bool {
-// 			item, err = cardinal.GetComponent[comp.Item](world, id)
+// 			item, err = cardinal.GetComponent[component.Item](world, id)
 // 			if item.PersonaTag == personaTag {
 // 				list = append(list, id)
 // 			}
@@ -142,7 +115,7 @@ func QueryPetIdByName(world cardinal.WorldContext, name string) (types.EntityID,
 // 	return list, err
 // }
 
-func GetMessageForRange(value int, rangeMessages map[constants.Range]constants.Message) (bool, string) {
+func GetMessageForRange(value int, rangeMessages map[game.Range]game.Message) (bool, string) {
 	for r, m := range rangeMessages {
 		if value >= r.Min && value <= r.Max {
 			return true, m.Text // Return the message and true (success)

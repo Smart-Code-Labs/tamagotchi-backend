@@ -54,8 +54,9 @@ func MustInitWorld(w *cardinal.World) {
 
 	// Register messages (user action)
 	Must(
-		cardinal.RegisterMessage[msg.CreatePlayerMsg, msg.CreatePlayerResult](w, "create-player"),
-		cardinal.RegisterMessage[msg.CreatePetMsg, msg.CreatePetResult](w, "create-pet"),
+		cardinal.RegisterMessage[msg.CreatePlayerMsg, msg.CreatePlayerReply](w, "create-player"),
+		cardinal.RegisterMessage[msg.CreatePetMsg, msg.CreatePetReply](w, "create-pet"),
+		cardinal.RegisterMessage[msg.CurePetMsg, msg.CurePetMsgReply](w, "cure-pet"),
 		cardinal.RegisterMessage[msg.PlayPetMsg, msg.PlayPetMsgReply](w, "play-pet"),
 		cardinal.RegisterMessage[msg.SleepPetMsg, msg.SleepPetMsgReply](w, "sleep-pet"),
 		cardinal.RegisterMessage[msg.BathPetMsg, msg.BathPetMsgReply](w, "bath-pet"),
@@ -66,14 +67,16 @@ func MustInitWorld(w *cardinal.World) {
 
 	// Register queries
 	Must(
-		cardinal.RegisterQuery[query.PetHealthRequest, query.PetHealthResponse](w, "pet-health", query.PetHealth),
-		cardinal.RegisterQuery[query.PetEnergyRequest, query.PetEnergyResponse](w, "pet-energy", query.PetEnergy),
-		cardinal.RegisterQuery[query.CurrentTickMsg, query.CurrentTickReply](w, "current-tick", query.CurrentTick),
-		cardinal.RegisterQuery[query.PetsMsg, query.PetsReply](w, "pets-list", query.Pets),
-		cardinal.RegisterQuery[query.ToysMsg, query.ToysReply](w, "toystore-list", query.Toys),
-		cardinal.RegisterQuery[query.FoodsMsg, query.FoodsReply](w, "foodstore-list", query.Foods),
-		cardinal.RegisterQuery[query.DrugsMsg, query.DrugsReply](w, "drugstore-list", query.Drugs),
-		cardinal.RegisterQuery[query.ItemListMsg, query.ItemListReply](w, "personaitem-list", query.PlayerItemList),
+		cardinal.RegisterQuery[query.PetHealthRequest, query.PetHealthResponse](w, "pet-health", query.QueryPetHealth),
+		cardinal.RegisterQuery[query.PetEnergyRequest, query.PetEnergyResponse](w, "pet-energy", query.QueryPetEnergy),
+		cardinal.RegisterQuery[query.CurrentTickMsg, query.CurrentTickReply](w, "current-tick", query.QueryCurrentTick),
+		cardinal.RegisterQuery[query.PetsMsg, query.PetsReply](w, "pets-list", query.GamePets),
+		cardinal.RegisterQuery[query.ToysMsg, query.ToysReply](w, "toystore-list", query.QueryToyStore),
+		cardinal.RegisterQuery[query.FoodsMsg, query.FoodsReply](w, "foodstore-list", query.QueryFoodStore),
+		cardinal.RegisterQuery[query.DrugsMsg, query.DrugsReply](w, "drugstore-list", query.QueryDrugStore),
+		cardinal.RegisterQuery[query.ItemListMsg, query.ItemListReply](w, "personaItem-list", query.QueryPlayerItems),
+		cardinal.RegisterQuery[query.PlayerExistMsg, query.PlayerExistReply](w, "player-exist", query.QueryPlayerExist),
+		cardinal.RegisterQuery[query.LeaderboardMsg, query.LeaderboardReply](w, "leaderboard", query.QueryLeaderboard),
 	)
 
 	// Each system executes deterministically in the order they are added.
@@ -86,11 +89,12 @@ func MustInitWorld(w *cardinal.World) {
 		actions.PetSpawnerAction,
 		actions.PlayerSpawnerAction,
 		// Execute Actions
-		actions.PlayAction,
-		actions.BathAction,
-		actions.SleepAction,
-		actions.FeedAction,
-		actions.BreedAction,
+		actions.PetPlayAction,
+		actions.PetCureAction,
+		actions.PetBathAction,
+		actions.PetSleepAction,
+		actions.PetFeedAction,
+		actions.PetBreedAction,
 		actions.BuyItemAction,
 		// Execute Game mechanics
 		mechanics.EnergyDeclineSystem,

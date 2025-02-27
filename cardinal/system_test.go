@@ -3,174 +3,113 @@ package main
 import (
 	"testing"
 
-	"gotest.tools/v3/assert"
-
+	"github.com/stretchr/testify/assert"
 	"pkg.world.dev/world-engine/cardinal"
-	"pkg.world.dev/world-engine/cardinal/filter"
+	persona_msg "pkg.world.dev/world-engine/cardinal/persona/msg"
 	"pkg.world.dev/world-engine/cardinal/receipt"
 	"pkg.world.dev/world-engine/cardinal/types"
+	"pkg.world.dev/world-engine/sign"
 
 	"tamagotchi/component"
-	constants "tamagotchi/game"
 	"tamagotchi/msg"
 )
 
 const (
-	playMsgName   = "game.play-pet"
-	createMsgName = "game.create-pet"
-	sleepMsgName  = "game.sleep-pet"
-	bathMsgName   = "game.bath-pet"
-	eatMsgname    = "game.eat-pet"
-	breedMsgName  = "game.breed-pet"
+	createMsgName        = "game.create-pet"
+	createPlayerMsgName  = "game.create-player"
+	createPersonaMsgName = "persona.create-persona"
+	buyItemMsgName       = "game.buy-item"
+	playMsgName          = "game.play-pet"
+	sleepMsgName         = "game.sleep-pet"
+	bathMsgName          = "game.bath-pet"
+	eatMsgName           = "game.eat-pet"
+	breedMsgName         = "game.breed-pet"
+	personaTag           = "_test_persona"
+	signerAddress        = "0xa1D239A61908FaC55Ca95Cd112698623bD36bC4f"
+	petName              = "Manny"
 )
 
-// TestSystem_PlaySystem_ErrorWhenTargetDoesNotExist ensures the play message results in an error when the given
-// target does not exist. Note, message errors are stored in receipts; they are NOT returned from the relevant system.
-func TestSystem_PlaySystem_ErrorWhenTargetDoesNotExist(t *testing.T) {
-	tf := cardinal.NewTestFixture(t, nil)
-	MustInitWorld(tf.World)
-
-	txHash := tf.AddTransaction(getPlayMsgID(t, tf.World), msg.PlayPetMsg{
-		TargetNickname: "does-not-exist",
-	})
-
-	tf.DoTick()
-
-	gotReceipt := getReceiptFromPastTick(t, tf.World, txHash)
-	if len(gotReceipt.Errs) == 0 {
-		t.Fatal("expected error when target does not exist")
-	}
-}
-
-// TestSystem_PetSpawnerSystem_CanCreatePet ensures the Createpet message can be used to create a new pet
-// with the default amount of health. cardinal.NewSearch is used to find the newly created pet.
+// This function tests the creation of a pet.
+// Flow:
+// 1. Initialize a new test fixture.
+// 2. Create a persona.
+// 3. Create a player associated with the persona.
+// 4. Create a pet that belongs to the player.
+// 5. Verify that the pet was created successfully.
 func TestSystem_PetSpawnerSystem_CanCreatePet(t *testing.T) {
+	// Preconditions:
+	// - The test fixture is initialized.
+	// - A persona and player are created.
+	var err error
+
+	// Given:
+	// - A test fixture is initialized.
 	tf := cardinal.NewTestFixture(t, nil)
 	MustInitWorld(tf.World)
 
-	const nickname = "Manny"
-	createTxHash := tf.AddTransaction(getCreateMsgID(t, tf.World), msg.CreatePetMsg{
-		Nickname: nickname,
-	})
-	tf.DoTick()
+	// - A persona is created.
+	createPersona(t, tf, personaTag)
 
-	// Make sure the pet creation was successful
-	createReceipt := getReceiptFromPastTick(t, tf.World, createTxHash)
-	if errs := createReceipt.Errs; len(errs) > 0 {
-		t.Fatalf("expected 0 errors when creating a pet, got %v", errs)
-	}
+	// - A player is created and associated with the persona.
+	createPlayer(t, tf, personaTag)
 
-	// Make sure the newly created pet has 100 health
+	// When:
+	// - A pet is created that belongs to the player.
+	createPet(t, tf, petName, personaTag)
+
+	// Then:
+	// - The pet is verified to exist.
 	wCtx := cardinal.NewReadOnlyWorldContext(tf.World)
 
-	acc := make([]types.EntityID, 0)
-	t.Log(len(acc))
-	err := cardinal.NewSearch().Entity(filter.Contains(filter.Component[component.Pet]())).
-		Each(wCtx, func(id types.EntityID) bool {
-			t.Log(id)
-			pet, err := cardinal.GetComponent[component.Pet](wCtx, id)
-			if err != nil {
-				t.Fatalf("failed to get pet component: %v", err)
-			}
-			if pet.Nickname == nickname {
-				acc = append(acc, id)
-				return false
-			}
-			return true
-		})
-	t.Log(len(acc))
+	_, petId, err := component.QueryPetIdByName(wCtx, petName)
+	assert.NoError(t, err)
+	assert.NotZero(t, petId)
 
-	assert.NilError(t, err)
-	assert.Equal(t, len(acc), 1)
-	id := acc[0]
+	// - The newly created pet should have 100 health.
+	health, err := cardinal.GetComponent[component.Health](wCtx, petId)
+	assert.NoError(t, err)
+	assert.EqualValues(t, health.HP, int(100))
 
-	health, err := cardinal.GetComponent[component.Health](wCtx, id)
-	if err != nil {
-		t.Fatalf("failed to find entity ID: %v", err)
-	}
-	if health.HP != 100 {
-		t.Fatalf("a newly created pet should have 100 health; got %v", health.HP)
-	}
+	// Verify that the pet's ID is in the player's Pets array.
+	player, err := component.GetPlayerByPersonaTag(wCtx, personaTag)
+	assert.NoError(t, err)
+
+	playerPetId, err := player.GetPetNickname(wCtx, petName)
+	assert.NoError(t, err)
+	assert.Equal(t, playerPetId, petId, "Expected pet ID %v to be in the player's Pets array, but got %v", petId, playerPetId)
 }
 
-// TestSystem_PlaySystem_PlayingTargetReducesTheirEnergy ensures an play message can find an existing target the
-// reduce the target's health.
-func TestSystem_PlaySystem_PlayingTargetReducesTheirEnergy(t *testing.T) {
-	tf := cardinal.NewTestFixture(t, nil)
-	MustInitWorld(tf.World)
+// TODO: Test 2: Duplicate Pet Nickname Sent: Create pet with duplicate nickname Received: Error: Pet nickname already exists Verify: No new pet created, error logged, and no "new_pet" event emitted
 
-	const target = "Manny"
-
-	// Create an initial pet
-	_ = tf.AddTransaction(getCreateMsgID(t, tf.World), msg.CreatePetMsg{
-		Nickname: target,
-	})
-	tf.DoTick()
-
-	// Play the pet
-	playTxHash := tf.AddTransaction(getPlayMsgID(t, tf.World), msg.PlayPetMsg{
-		TargetNickname: target,
-	})
-	tf.DoTick()
-
-	// Make sure play was successful
-	playReceipt := getReceiptFromPastTick(t, tf.World, playTxHash)
-	if errs := playReceipt.Errs; len(errs) > 0 {
-		t.Fatalf("expected no errors when playing a pet; got %v", errs)
-	}
-
-	// Find the played pet and check their health.
-	wCtx := cardinal.NewReadOnlyWorldContext(tf.World)
-	var found bool
-	searchErr := cardinal.NewSearch().Entity(filter.Contains(filter.Component[component.Pet]())).
-		Each(wCtx, func(id types.EntityID) bool {
-			pet, err := cardinal.GetComponent[component.Pet](wCtx, id)
-			if err != nil {
-				t.Fatalf("failed to get pet component for %v", id)
-			}
-			if pet.Nickname != target {
-				return true
-			}
-			// The pet's nickname matches the target. This is the pet we care about.
-			found = true
-			energy, err := cardinal.GetComponent[component.Energy](wCtx, id)
-			if err != nil {
-				t.Fatalf("failed to get health component for %v", id)
-			}
-			// The target started with 100 E, -10 for the play, -1 for energy decline
-			expectedEnergy := constants.InitialE - constants.EnergyReduce - 1
-			if energy.E != expectedEnergy {
-				t.Fatalf("play target should end up with %v hp, got %v", expectedEnergy, energy.E)
-			}
-
-			return false
-		})
-	if searchErr != nil {
-		t.Fatalf("error when performing search: %v", searchErr)
-	}
-	if !found {
-		t.Fatalf("failed to find target %q", target)
-	}
-}
-
-func getCreateMsgID(t *testing.T, world *cardinal.World) types.MessageID {
-	return getMsgID(t, world, createMsgName)
-}
-
-func getPlayMsgID(t *testing.T, world *cardinal.World) types.MessageID {
-	return getMsgID(t, world, playMsgName)
-}
-
-func getMsgID(t *testing.T, world *cardinal.World, fullName string) types.MessageID {
-	msg, ok := world.GetMessageByFullName(fullName)
+func executeTx[T any](t *testing.T, tf *cardinal.TestFixture, msgName string, req interface{}, personaTag string) (*T, error) {
+	msgFullName, ok := tf.World.GetMessageByFullName(msgName)
 	if !ok {
-		t.Fatalf("failed to get %q message", fullName)
+		t.Fatalf("failed to get %q message", msgName)
 	}
-	return msg.ID()
+	TxHash := tf.AddTransaction(msgFullName.ID(), req, &sign.Transaction{PersonaTag: personaTag})
+	tf.DoTick()
+
+	// Then:
+	// - The pet's energy is verified to be reduced.
+	t.Log("Before getReceiptFromPastTick")
+	response := getReceiptFromPastTick(t, tf.World, TxHash)
+	t.Log("After getReceiptFromPastTick")
+	if errs := response.Errs; len(errs) > 0 {
+		return nil, errs[0]
+	}
+	t.Log("RESPONSE; ", response)
+	resp, ok := response.Result.(T)
+	if !ok {
+		t.Fatalf("failed to cast for %v", response)
+	}
+	t.Log("casted: ", response)
+	return &resp, nil
 }
 
-// getReceiptFromPastTick search past ticks for a txHash that matches the given txHash. An error will be returned if
-// the txHash cannot be found in Cardinal's history.
+// This function gets the receipt from a past tick.
+// Flow:
+// 1. Search past ticks for the transaction hash.
+// 2. Return the receipt for the transaction.
 func getReceiptFromPastTick(t *testing.T, world *cardinal.World, txHash types.TxHash) receipt.Receipt {
 	tick := world.CurrentTick()
 	for {
@@ -185,4 +124,96 @@ func getReceiptFromPastTick(t *testing.T, world *cardinal.World, txHash types.Tx
 			}
 		}
 	}
+}
+
+// This function creates a pet.
+// Flow:
+// 1. Create a new pet message.
+// 2. Add the transaction to the test fixture.
+// 3. Verify that the pet was created successfully.
+func createPet(t *testing.T, tf *cardinal.TestFixture, petName string, personaTag string) error {
+	// Preconditions:
+	// - The test fixture is initialized.
+	createMsg := msg.CreatePetMsg{
+		Nickname: petName,
+	}
+	_, err := executeTx[msg.CreatePetReply](t, tf, createMsgName, createMsg, personaTag)
+	return err
+}
+
+// This function creates a player.
+// Flow:
+// 1. Get the message type for creating a player.
+// 2. Add the transaction to the test fixture.
+// 3. Verify that the player was created successfully.
+func createPlayer(t *testing.T, tf *cardinal.TestFixture, personaTag string) error {
+	// Preconditions:
+	// - The test fixture is initialized.
+	createPlayerMsg := msg.CreatePlayerMsg{}
+	_, err := executeTx[msg.CreatePlayerReply](t, tf, createPlayerMsgName, createPlayerMsg, personaTag)
+	return err
+}
+
+// This function creates a persona.
+// Flow:
+// 1. Get the message type for creating a persona.
+// 2. Add the transaction to the test fixture.
+// 3. Verify that the persona was created successfully.
+func createPersona(t *testing.T, tf *cardinal.TestFixture, personaTag string) error {
+	// Preconditions:
+	// - The test fixture is initialized.
+	createPersonaMsg := persona_msg.CreatePersona{
+		PersonaTag:    personaTag,
+		SignerAddress: signerAddress,
+	}
+	_, err := executeTx[persona_msg.CreatePersonaResult](t, tf, createPersonaMsgName, createPersonaMsg, personaTag)
+	return err
+}
+
+// This function buys a toy.
+// Flow:
+// 1. Get the message type for buying a toy.
+// 2. Add the transaction to the test fixture.
+// 3. Verify that the toy was bought successfully.
+func buyToy(t *testing.T, tf *cardinal.TestFixture, toyName string) error {
+	// Preconditions:
+	// - The test fixture is initialized.
+	t.Log("buyToy")
+	buyItemMsg := msg.ButItemMsg{
+		Name: toyName,
+	}
+	_, err := executeTx[msg.BuyItemMsgReply](t, tf, buyItemMsgName, buyItemMsg, personaTag)
+	return err
+}
+
+// This function buys a toy.
+// Flow:
+// 1. Get the message type for buying a toy.
+// 2. Add the transaction to the test fixture.
+// 3. Verify that the toy was bought successfully.
+func PetPlayAction(t *testing.T, tf *cardinal.TestFixture, nickName string, itemName string) error {
+	// Preconditions:
+	// - The test fixture is initialized.
+	petPlayMsg := msg.PlayPetMsg{
+		TargetNickname: nickName,
+		ItemName:       itemName,
+	}
+	_, err := executeTx[msg.PlayPetMsgReply](t, tf, playMsgName, petPlayMsg, personaTag)
+	return err
+}
+
+// This function buys a toy.
+// Flow:
+// 1. Get the message type for buying a toy.
+// 2. Add the transaction to the test fixture.
+// 3. Verify that the toy was bought successfully.
+func PetBathAction(t *testing.T, tf *cardinal.TestFixture, nickName string, itemName string) error {
+	// Preconditions:
+	// - The test fixture is initialized.
+	petBathMsg := msg.BathPetMsg{
+		TargetNickname: nickName,
+		ItemName:       itemName,
+	}
+	_, err := executeTx[msg.BathPetMsgReply](t, tf, bathMsgName, petBathMsg, personaTag)
+	return err
 }

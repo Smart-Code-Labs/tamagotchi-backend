@@ -15,6 +15,12 @@ export interface ReceiptsResponse {
   receipts: Receipt[];
 }
 
+export interface CreatePlayerMsg {}
+
+export interface CreatePlayerResult {
+  success: boolean;
+}
+
 export interface CreatePetMsg {
   nickname: string;
 }
@@ -25,6 +31,7 @@ export interface CreatePetResult {
 
 export interface BathPetMsg {
   target: string;
+  item_name: string;
 }
 
 export interface BathPetMsgReply {
@@ -45,6 +52,7 @@ export interface BreedPetMsgReply {
 
 export interface FeedPetMsg {
   target: string;
+  item_name: string;
 }
 
 export interface FeedPetMsgReply {
@@ -55,6 +63,7 @@ export interface FeedPetMsgReply {
 
 export interface PlayPetMsg {
   target: string;
+  item_name: string;
 }
 
 export interface PlayPetMsgReply {
@@ -63,6 +72,15 @@ export interface PlayPetMsgReply {
   wellness: number;
   activity: string;
   duration: number;
+}
+
+export interface CurePetMsg {
+	target: string
+	item_name: string
+}
+
+export interface CurePetMsgReply {
+	health: number
 }
 
 export interface SleepPetMsg {
@@ -81,4 +99,12 @@ export interface ThinkPetMsg {
 
 export interface ThinkPetMsgReply {
   think: string;
+}
+
+export interface ButItemMsg {
+	name: string
+}
+
+export interface BuyItemMsgReply {
+	success: boolean
 }
